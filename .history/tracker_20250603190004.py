@@ -22,8 +22,8 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-ODDS_API_KEY = 'b0d244311acf3c71187359e040ca2d3e'
-SPORTSDATAIO_KEY = '5c99566b9c5d4d53a8d394d8eb57b100'
+ODDS_API_KEY = '416c30d26f73d0e2e25d670500f292f3'
+SPORTSDATAIO_KEY = 'd6754260d2834c3bbc4c1d14a1d27e62'
 
 
 def get_next_airtable_id():
