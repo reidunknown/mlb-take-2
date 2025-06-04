@@ -26,25 +26,60 @@ ODDS_API_KEY = 'b0d244311acf3c71187359e040ca2d3e'
 SPORTSDATAIO_KEY = '5c99566b9c5d4d53a8d394d8eb57b100'
 
 
-def get_next_airtable_id():
-    params = {
-        "fields[]": ["id"],
-        "pageSize": 100
-    }
-    response = requests.get(AIRTABLE_URL, headers=HEADERS, params=params)
-    if response.status_code != 200:
-        print("⚠️ Couldn't fetch existing IDs. Starting from 1.")
-        return 1
+def get_existing_game_keys():
+    """Fetch unique keys like '2025-06-03|Yankees|Red Sox' to prevent duplicates."""
+    existing_keys = set()
+    offset = None
 
-    records = response.json().get("records", [])
-    existing_ids = []
-    for record in records:
-        try:
-            existing_ids.append(int(record["fields"].get("id", 0)))
-        except (ValueError, TypeError):
-            continue
+    while True:
+        params = {"pageSize": 100}
+        if offset:
+            params["offset"] = offset
 
-    return max(existing_ids) + 1 if existing_ids else 1
+        response = requests.get(AIRTABLE_URL, headers=HEADERS, params=params)
+        if response.status_code != 200:
+            print("❌ Failed to fetch existing records for deduplication.")
+            break
+
+        records = response.json().get("records", [])
+        for record in records:
+            fields = record.get("fields", {})
+            key = f"{fields.get('date')}|{fields.get('home_team')}|{fields.get('away_team')}"
+            existing_keys.add(key)
+
+        offset = response.json().get("offset")
+        if not offset:
+            break
+
+    return existing_keys
+
+
+def get_max_airtable_id():
+    offset = None
+    max_id = 0
+
+    while True:
+        url = AIRTABLE_URL
+        if offset:
+            url += f"?offset={offset}"
+
+        response = requests.get(url, headers=HEADERS)
+        if response.status_code != 200:
+            print("❌ Failed to fetch records to determine max ID.")
+            break
+
+        records = response.json().get('records', [])
+        for record in records:
+            fields = record.get("fields", {})
+            record_id = fields.get("id")
+            if record_id and isinstance(record_id, int):
+                max_id = max(max_id, record_id)
+
+        offset = response.json().get("offset")
+        if not offset:
+            break
+
+    return max_id
 
 
 def extract_lock_info():
@@ -155,51 +190,32 @@ def extract_lock_info():
     return lock_rows
 
 
-def get_max_airtable_id():
-    offset = None
-    max_id = 0
-
-    while True:
-        url = AIRTABLE_URL
-        if offset:
-            url += f"?offset={offset}"
-
-        response = requests.get(url, headers=HEADERS)
-        if response.status_code != 200:
-            print("❌ Failed to fetch records to determine max ID.")
-            break
-
-        records = response.json().get('records', [])
-        for record in records:
-            fields = record.get("fields", {})
-            record_id = fields.get("id")
-            if record_id and isinstance(record_id, int):
-                max_id = max(max_id, record_id)
-
-        offset = response.json().get("offset")
-        if not offset:
-            break
-
-    return max_id
-
-
 def upload_to_airtable(rows):
+    existing_keys = get_existing_game_keys()
     current_max_id = get_max_airtable_id()
     new_id = current_max_id + 1
+    uploaded = 0
 
     for row in rows:
+        key = f"{row['date']}|{row['home_team']}|{row['away_team']}"
+        if key in existing_keys:
+            print(f"⚠️ Duplicate detected, skipping: {key}")
+            continue
+
         row["id"] = new_id
-        data = {
-            "fields": row
-        }
+        data = {"fields": row}
+
         response = requests.post(AIRTABLE_URL, headers=HEADERS, json=data)
-        if response.status_code == 200 or response.status_code == 201:
+        if response.status_code in (200, 201):
             print(f"✅ Uploaded row #{new_id} for {row['home_team']} vs {row['away_team']}")
+            uploaded += 1
         else:
             print(f"❌ Error uploading row #{new_id}: {response.status_code}")
             print(response.json())
 
         new_id += 1
+
+    print(f"🔄 Finished uploading. {uploaded} new rows added.")
 
 
 def run_tracker():
@@ -207,7 +223,6 @@ def run_tracker():
     rows = extract_lock_info()
     if rows:
         upload_to_airtable(rows)
-        print(f"✅ Uploaded {len(rows)} rows to Airtable.")
     else:
         print("⚠️ No qualifying games found to upload.")
 
