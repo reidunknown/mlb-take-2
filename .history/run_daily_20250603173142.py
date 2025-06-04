@@ -1,6 +1,6 @@
 import streamlit as st
 from update_game import update_games
-from tracker import run_tracker
+from tracker import track_games
 from app import show_ui  # Rename your app's Streamlit logic to a function
 
 def main():
@@ -11,7 +11,7 @@ def main():
         update_games()
 
     with st.spinner("Tracking game results..."):
-        run_tracker()
+        track_games()
 
     # Step 2: Show Streamlit UI
     show_ui()
