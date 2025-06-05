@@ -22,7 +22,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-ODDS_API_KEY = '9891ed9254b6592da0b72b05b1e0dd69'
+ODDS_API_KEY = 'b0d244311acf3c71187359e040ca2d3e'
 SPORTSDATAIO_KEY = '5c99566b9c5d4d53a8d394d8eb57b100'
 
 
